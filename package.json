@@ -4,7 +4,7 @@
   "description": "Synchronisiert mcp.json und startet den Llama-Server beim Start von VS Code. Die Pfade zu den Skripten sind in den Extension-Einstellungen konfigurierbar.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.108.1"
+    "vscode": "^1.108.0"
   },
   "categories": [
     "Other"
