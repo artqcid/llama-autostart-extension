@@ -8,19 +8,54 @@ import * as fs from 'fs';
 // Store running process IDs for cleanup
 const runningProcesses: { name: string; pid: number }[] = [];
 const terminals: vscode.Terminal[] = [];
+let outputChannel: vscode.OutputChannel;
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+	
+	// Create output channel for debugging
+	outputChannel = vscode.window.createOutputChannel('Llama Autostart');
+	context.subscriptions.push(outputChannel);
+	
+	outputChannel.appendLine('=== Llama Autostart Extension aktiviert ===');
+	outputChannel.show();
+	
+	vscode.window.showInformationMessage('Llama Autostart Extension wurde aktiviert!');
 
 	console.log('Llama Autostart Extension aktiviert.');
 
+	// Register manual start command
+	let startCommand = vscode.commands.registerCommand('llamaAutostart.startServers', () => {
+		startServers();
+	});
+
+	// Register stop command
+	let stopCommand = vscode.commands.registerCommand('llamaAutostart.stopServers', () => {
+		stopServers();
+	});
+
+	context.subscriptions.push(startCommand, stopCommand);
+
+	// Autostart on VS Code startup
+	startServers();
+}
+
+function startServers() {
+	outputChannel.appendLine('=== startServers() aufgerufen ===');
+	
 	// Autostart-Script aus den Einstellungen lesen
 	const config = vscode.workspace.getConfiguration('llamaAutostart');
 	const scriptPath = config.get<string>('autostartScriptPath');
 	const mcpConfigPath = config.get<string>('mcpConfigPath');
 	const enableMcpServer = config.get<boolean>('enableMcpServer', true);
 	const useIntegratedTerminal = config.get<boolean>('useIntegratedTerminal', true);
+
+	outputChannel.appendLine(`Konfiguration gelesen:`);
+	outputChannel.appendLine(`  scriptPath: ${scriptPath}`);
+	outputChannel.appendLine(`  mcpConfigPath: ${mcpConfigPath}`);
+	outputChannel.appendLine(`  enableMcpServer: ${enableMcpServer}`);
+	outputChannel.appendLine(`  useIntegratedTerminal: ${useIntegratedTerminal}`);
 
 	// Llama-Server starten
 	if (scriptPath) {
@@ -35,11 +70,58 @@ export function activate(context: vscode.ExtensionContext) {
 	}
 }
 
+function stopServers() {
+	vscode.window.showInformationMessage('Llama Autostart: Stoppe Server...');
+	
+	// Schließe alle erstellten Terminals
+	terminals.forEach(terminal => {
+		terminal.dispose();
+	});
+	terminals.length = 0;
+
+	// Stoppe llama-server
+	try {
+		cp.execSync('powershell -NoProfile -Command "Get-Process llama-server -ErrorAction SilentlyContinue | Stop-Process -Force"', {
+			windowsHide: true
+		});
+		vscode.window.showInformationMessage('llama-server gestoppt');
+	} catch (err) {
+		console.log('Kein llama-server-Prozess gefunden oder Fehler beim Stoppen');
+	}
+
+	// Stoppe alle MCP-Server
+	runningProcesses.forEach(proc => {
+		try {
+			process.kill(proc.pid, 'SIGTERM');
+			console.log(`${proc.name} (PID: ${proc.pid}) gestoppt`);
+		} catch (err) {
+			console.log(`Fehler beim Stoppen von ${proc.name} (PID: ${proc.pid}):`, err);
+		}
+	});
+	runningProcesses.length = 0;
+
+	// Stoppe Python MCP-Prozesse
+	try {
+		cp.execSync('powershell -NoProfile -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like \'*web_mcp.py*\' } | Stop-Process -Force"', {
+			windowsHide: true
+		});
+	} catch (err) {
+		console.log('Keine MCP Python-Prozesse gefunden');
+	}
+}
+
 function startLlamaServer(scriptPath: string, useIntegratedTerminal: boolean) {
+	outputChannel.appendLine(`=== startLlamaServer() aufgerufen ===`);
+	outputChannel.appendLine(`  scriptPath: ${scriptPath}`);
+	outputChannel.appendLine(`  useIntegratedTerminal: ${useIntegratedTerminal}`);
+	
 	if (!fs.existsSync(scriptPath)) {
+		outputChannel.appendLine(`  FEHLER: Startscript nicht gefunden!`);
 		vscode.window.showErrorMessage(`Llama Autostart: Startscript nicht gefunden: ${scriptPath}`);
 		return;
 	}
+	
+	outputChannel.appendLine(`  Script existiert, starte Server...`);
 
 	vscode.window.showInformationMessage('Llama Autostart: Starte Llama-Server...');
 
@@ -50,7 +132,17 @@ function startLlamaServer(scriptPath: string, useIntegratedTerminal: boolean) {
 			hideFromUser: false
 		});
 		terminals.push(terminal);
-		terminal.sendText(`powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`);
+		
+		outputChannel.appendLine(`  Terminal erstellt: "Llama Server"`);
+		outputChannel.appendLine(`  Starte Befehl: powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`);
+		
+		// Zeige das Terminal
+		terminal.show();
+		
+		// Sende den Befehl mit Fehlerbehandlung
+		terminal.sendText(`powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`, true);
+		
+		outputChannel.appendLine(`  Befehl gesendet!`);
 		
 		setTimeout(() => {
 			vscode.window.showInformationMessage('Llama Autostart: Llama-Server wurde gestartet (siehe Terminal).');

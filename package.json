@@ -1,8 +1,9 @@
 {
-  "name": "yyy",
+  "name": "llama-autostart",
   "displayName": "Llama Autostart Extension",
   "description": "Synchronisiert mcp.json und startet den Llama-Server beim Start von VS Code. Die Pfade zu den Skripten sind in den Extension-Einstellungen konfigurierbar.",
-  "version": "0.0.1",
+  "version": "0.0.3",
+  "publisher": "artqcid",
   "engines": {
     "vscode": "^1.108.0"
   },
@@ -10,14 +11,18 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "*"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "yyy.helloWorld",
-        "title": "Hello World"
+        "command": "llamaAutostart.startServers",
+        "title": "Llama: Start Servers Manually"
+      },
+      {
+        "command": "llamaAutostart.stopServers",
+        "title": "Llama: Stop Servers"
       }
     ],
     "configuration": {
