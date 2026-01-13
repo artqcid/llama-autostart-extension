@@ -4,6 +4,10 @@
   "description": "Synchronisiert mcp.json und startet den Llama-Server beim Start von VS Code. Die Pfade zu den Skripten sind in den Extension-Einstellungen konfigurierbar.",
   "version": "0.0.3",
   "publisher": "artqcid",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/artqcid/vscode-autostart-extension"
+  },
   "engines": {
     "vscode": "^1.108.0"
   },
@@ -11,7 +15,7 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
