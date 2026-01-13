@@ -28,6 +28,21 @@
           "type": "string",
           "default": "C:/Users/marku/.continue/llama-vscode-autostart.ps1",
           "description": "Pfad zum PowerShell-Startscript (autostart.ps1) für den Llama-Server."
+        },
+        "llamaAutostart.mcpConfigPath": {
+          "type": "string",
+          "default": "C:/Users/marku/AppData/Roaming/Code/User/mcp.json",
+          "description": "Pfad zur mcp.json-Konfiguration für MCP-Server."
+        },
+        "llamaAutostart.enableMcpServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "MCP-Server automatisch starten (basierend auf mcp.json)."
+        },
+        "llamaAutostart.useIntegratedTerminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Server-Ausgaben im integrierten VS Code Terminal anzeigen (anstatt externe Fenster)."
         }
       }
     }
