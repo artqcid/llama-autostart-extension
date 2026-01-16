@@ -162,12 +162,12 @@ function startWebMcp(useIntegratedTerminal: boolean) {
 
 	if (useIntegratedTerminal) {
 		const terminal = vscode.window.createTerminal({
-			name: 'MCP: web-context',
+			name: 'MCP: mcp-context',
 			hideFromUser: false
 		});
 		terminals.push(terminal);
 		
-		outputChannel.appendLine(`  Terminal erstellt: "MCP: web-context"`);
+		outputChannel.appendLine(`  Terminal erstellt: "MCP: mcp-context"`);
 		outputChannel.appendLine(`  Starte Befehl: "${pythonPath}" "${mcpScript}"`);
 		
 		terminal.show();
