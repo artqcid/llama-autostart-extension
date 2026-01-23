@@ -8,11 +8,28 @@ const terminals: vscode.Terminal[] = [];
 let outputChannel: vscode.OutputChannel;
 let serversStarted = false;
 
+// Server paths configuration (JUCE Development)
+const SERVER_PATHS = {
+	mcp: 'C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\mcp-server-misc',
+	embedding: 'C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\embedding-server-misc',
+	llama: 'C:\\Users\\marku\\.continue\\llama-vscode-autostart.ps1'
+};
+
+// Load paths from settings
+function getServerPaths() {
+	const config = vscode.workspace.getConfiguration('juce-server-autostart');
+	return {
+		mcp: config.get<string>('mcpServerPath', SERVER_PATHS.mcp),
+		embedding: config.get<string>('embeddingServerPath', SERVER_PATHS.embedding),
+		llama: config.get<string>('llamaScriptPath', SERVER_PATHS.llama)
+	};
+}
+
 export function activate(context: vscode.ExtensionContext) {
-	outputChannel = vscode.window.createOutputChannel('Server Autostart');
+	outputChannel = vscode.window.createOutputChannel('JUCE Server Autostart');
 	context.subscriptions.push(outputChannel);
 	
-	outputChannel.appendLine('[INFO] ===== AI Server Autostart Extension aktiviert =====');
+	outputChannel.appendLine('[INFO] ===== JUCE Server Autostart Extension aktiviert =====');
 	outputChannel.show(true);
 	
 	let startCommand = vscode.commands.registerCommand('serverAutostart.startServers', () => {
@@ -30,8 +47,9 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(startCommand, stopCommand, statusCommand);
 
 	// Autostart on VS Code startup
-	outputChannel.appendLine('[INFO] Starte alle Server beim Extension-Startup...');
-	setTimeout(() => startAllServers(), 2000);
+	const autoStartDelay = vscode.workspace.getConfiguration('juce-server-autostart').get<number>('autoStartDelay', 2000);
+	outputChannel.appendLine(`[INFO] Starte alle Server beim Extension-Startup (Verzögerung: ${autoStartDelay}ms)...`);
+	setTimeout(() => startAllServers(), autoStartDelay);
 }
 
 function startAllServers() {
@@ -44,70 +62,113 @@ function startAllServers() {
 	outputChannel.appendLine('[INFO] ===== Starte alle Server =====');
 	vscode.window.showInformationMessage('Starte AI-Server...');
 
-	const workspaceFolders = vscode.workspace.workspaceFolders;
-	if (!workspaceFolders || workspaceFolders.length === 0) {
-		outputChannel.appendLine('[ERROR] Kein Workspace gefunden');
-		vscode.window.showErrorMessage('Kein Workspace geöffnet.');
+	// Validate server paths
+	const pathsValid = validateServerPaths();
+	if (!pathsValid) {
+		vscode.window.showErrorMessage('Ein oder mehrere Server-Pfade sind nicht konfiguriert!');
 		return;
 	}
 
-	const workspaceRoot = workspaceFolders[0].uri.fsPath;
-	const manageScriptPath = path.join(workspaceRoot, 'scripts', 'manage_servers.ps1');
-	const startMcpScriptPath = path.join(workspaceRoot, 'scripts', 'start_mcp_server.ps1');
-
-	// Starte Llama + Embedding via manage_servers.ps1
-	startManagedServers(manageScriptPath);
+	// Start Llama Server (fixed path)
+	startLlamaServer();
 	
-	// Starte MCP Server standalone
+	// Start Embedding Server
 	setTimeout(() => {
-		startStandaloneMcp(startMcpScriptPath);
-	}, 3000);
+		startEmbeddingServer();
+	}, 2000);
+	
+	// Start MCP Server
+	setTimeout(() => {
+		startMcpServer();
+	}, 5000);
 
 	serversStarted = true;
 }
 
-function startManagedServers(scriptPath: string) {
-	outputChannel.appendLine(`[INFO] Starte Llama + Embedding via: ${scriptPath}`);
+function validateServerPaths(): boolean {
+	const paths = getServerPaths();
+	let allValid = true;
 	
-	if (!fs.existsSync(scriptPath)) {
-		outputChannel.appendLine(`[ERROR] manage_servers.ps1 nicht gefunden: ${scriptPath}`);
-		vscode.window.showErrorMessage(`Script nicht gefunden: ${scriptPath}`);
-		return;
+	if (!fs.existsSync(paths.llama)) {
+		outputChannel.appendLine(`[ERROR] Llama Script nicht gefunden: ${paths.llama}`);
+		allValid = false;
 	}
+	
+	if (!fs.existsSync(paths.embedding)) {
+		outputChannel.appendLine(`[ERROR] Embedding-Server Pfad nicht gefunden: ${paths.embedding}`);
+		allValid = false;
+	}
+	
+	if (!fs.existsSync(paths.mcp)) {
+		outputChannel.appendLine(`[ERROR] MCP-Server Pfad nicht gefunden: ${paths.mcp}`);
+		allValid = false;
+	}
+	
+	return allValid;
+}
 
+function startLlamaServer() {
+	const paths = getServerPaths();
+	outputChannel.appendLine('[INFO] Starte Llama-Server...');
+	
 	const terminal = vscode.window.createTerminal({
-		name: 'AI Servers',
+		name: 'Llama Server',
 		hideFromUser: false
 	});
 	terminals.push(terminal);
-
+	
 	terminal.show();
-	const command = `pwsh -NoProfile -Command "& '${scriptPath}' -Action 'start-all'"`;
+	const command = `powershell -NoProfile -ExecutionPolicy Bypass -File "${paths.llama}"`;
 	outputChannel.appendLine(`[CMD] ${command}`);
 	terminal.sendText(command, true);
 }
 
-function startStandaloneMcp(scriptPath: string) {
-	outputChannel.appendLine(`[INFO] Starte Standalone MCP Server: ${scriptPath}`);
+function startEmbeddingServer() {
+	const paths = getServerPaths();
+	outputChannel.appendLine(`[INFO] Starte Embedding-Server: ${paths.embedding}`);
 	
-	if (!fs.existsSync(scriptPath)) {
-		outputChannel.appendLine(`[WARN] start_mcp_server.ps1 nicht gefunden: ${scriptPath}`);
-		outputChannel.appendLine('[INFO] MCP Server kann später manuell gestartet werden');
+	const startScript = path.join(paths.embedding, 'start.ps1');
+	
+	if (!fs.existsSync(startScript)) {
+		outputChannel.appendLine(`[ERROR] start.ps1 nicht gefunden: ${startScript}`);
+		vscode.window.showErrorMessage('Embedding Server start.ps1 nicht gefunden');
 		return;
 	}
+	
+	const terminal = vscode.window.createTerminal({
+		name: 'Embedding Server',
+		hideFromUser: false
+	});
+	terminals.push(terminal);
+	
+	terminal.show();
+	const command = `pwsh -NoProfile -ExecutionPolicy Bypass -File "${startScript}"`;
+	outputChannel.appendLine(`[CMD] ${command}`);
+	terminal.sendText(command, true);
+}
 
+function startMcpServer() {
+	const paths = getServerPaths();
+	outputChannel.appendLine(`[INFO] Starte MCP-Server: ${paths.mcp}`);
+	
+	const startScript = path.join(paths.mcp, 'start.ps1');
+	
+	if (!fs.existsSync(startScript)) {
+		outputChannel.appendLine(`[ERROR] start.ps1 nicht gefunden: ${startScript}`);
+		vscode.window.showErrorMessage('MCP Server start.ps1 nicht gefunden');
+		return;
+	}
+	
 	const terminal = vscode.window.createTerminal({
 		name: 'MCP Server',
 		hideFromUser: false
 	});
 	terminals.push(terminal);
-
+	
 	terminal.show();
-	const command = `pwsh -NoProfile -Command "& '${scriptPath}'"`; 
+	const command = `pwsh -NoProfile -ExecutionPolicy Bypass -File "${startScript}"`;
 	outputChannel.appendLine(`[CMD] ${command}`);
 	terminal.sendText(command, true);
-	
-	outputChannel.appendLine('[OK] MCP Server Prozess gestartet');
 }
 
 function stopAllServers() {
@@ -155,26 +216,53 @@ function stopAllServers() {
 
 function showServerStatus() {
 	outputChannel.appendLine('[INFO] ===== Server Status =====');
-	vscode.window.showInformationMessage('Zeige Server Status...');
-
-	const workspaceFolders = vscode.workspace.workspaceFolders;
-	if (!workspaceFolders || workspaceFolders.length === 0) {
-		outputChannel.appendLine('[ERROR] Kein Workspace gefunden');
-		return;
+	
+	// Check Llama
+	try {
+		const result = cp.execSync(
+			'powershell -NoProfile -Command "Get-Process llama-server -ErrorAction SilentlyContinue | Select-Object ProcessName, Id"',
+			{ encoding: 'utf-8', windowsHide: true }
+		);
+		if (result) {
+			outputChannel.appendLine('[OK] Llama-Server läuft');
+		} else {
+			outputChannel.appendLine('[STOP] Llama-Server nicht aktiv');
+		}
+	} catch {
+		outputChannel.appendLine('[STOP] Llama-Server nicht aktiv');
 	}
-
-	const workspaceRoot = workspaceFolders[0].uri.fsPath;
-	const statusScriptPath = path.join(workspaceRoot, 'scripts', 'manage_servers.ps1');
-
-	const terminal = vscode.window.createTerminal({
-		name: 'Server Status',
-		hideFromUser: false
-	});
-	terminals.push(terminal);
-
-	terminal.show();
-	const command = `pwsh -NoProfile -Command "& '${statusScriptPath}' -Action 'status'"`;
-	terminal.sendText(command, true);
+	
+	// Check Embedding
+	try {
+		const result = cp.execSync(
+			"powershell -NoProfile -Command \"Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*embedding*' } | Select-Object ProcessName, Id\"",
+			{ encoding: 'utf-8', windowsHide: true }
+		);
+		if (result) {
+			outputChannel.appendLine('[OK] Embedding-Server läuft');
+		} else {
+			outputChannel.appendLine('[STOP] Embedding-Server nicht aktiv');
+		}
+	} catch {
+		outputChannel.appendLine('[STOP] Embedding-Server nicht aktiv');
+	}
+	
+	// Check MCP
+	try {
+		const result = cp.execSync(
+			"powershell -NoProfile -Command \"Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*mcp*' } | Select-Object ProcessName, Id\"",
+			{ encoding: 'utf-8', windowsHide: true }
+		);
+		if (result) {
+			outputChannel.appendLine('[OK] MCP-Server läuft');
+		} else {
+			outputChannel.appendLine('[STOP] MCP-Server nicht aktiv');
+		}
+	} catch {
+		outputChannel.appendLine('[STOP] MCP-Server nicht aktiv');
+	}
+	
+	vscode.window.showInformationMessage('Server Status angezeigt (siehe Output)');
 }
 
 export function deactivate() {

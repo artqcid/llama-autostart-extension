@@ -1,7 +1,7 @@
 {
-  "name": "server-autostart",
-  "displayName": "Server Autostart Extension",
-  "description": "Automatically starts AI servers (Llama, Embedding, MCP) when VS Code loads.",
+  "name": "juce-server-autostart",
+  "displayName": "JUCE Server Autostart Extension",
+  "description": "Automatically starts JUCE AI servers (Llama, Embedding, MCP) when VS Code loads.",
   "version": "0.0.5",
   "publisher": "artqcid",
   "repository": {
@@ -35,17 +35,32 @@
     ],
     "configuration": {
       "type": "object",
-      "title": "Server Autostart Extension Configuration",
+      "title": "JUCE Server Autostart Configuration",
       "properties": {
-        "serverAutostart.autoStartDelay": {
+        "juce-server-autostart.mcpServerPath": {
+          "type": "string",
+          "default": "C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\mcp-server-misc",
+          "description": "Path to JUCE MCP Server directory"
+        },
+        "juce-server-autostart.embeddingServerPath": {
+          "type": "string",
+          "default": "C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\embedding-server-misc",
+          "description": "Path to JUCE Embedding Server directory"
+        },
+        "juce-server-autostart.llamaScriptPath": {
+          "type": "string",
+          "default": "C:\\Users\\marku\\.continue\\llama-vscode-autostart.ps1",
+          "description": "Path to Llama autostart PowerShell script"
+        },
+        "juce-server-autostart.autoStartDelay": {
           "type": "number",
           "default": 2000,
-          "description": "Delay in milliseconds before starting servers on VS Code activation (default: 2000ms)"
+          "description": "Delay in milliseconds before starting servers on VS Code activation"
         },
-        "serverAutostart.mcpStartDelay": {
+        "juce-server-autostart.mcpStartDelay": {
           "type": "number",
           "default": 3000,
-          "description": "Additional delay in milliseconds before starting MCP server after Llama+Embedding (default: 3000ms)"
+          "description": "Additional delay in milliseconds before starting MCP server"
         }
       }
     }
