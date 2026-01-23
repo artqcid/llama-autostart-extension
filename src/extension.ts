@@ -158,63 +158,53 @@ function startLlamaServer(scriptPath: string, useIntegratedTerminal: boolean) {
 function startWebMcp(useIntegratedTerminal: boolean) {
 	outputChannel.appendLine('=== startWebMcp() aufgerufen ===');
 	
-	const pythonPath = 'C:\\mcp\\.venv\\Scripts\\python.exe';
-	const mcpScript = 'C:\\mcp\\web_mcp.py';
-
-	if (!fs.existsSync(pythonPath)) {
-		outputChannel.appendLine(`  FEHLER: Python nicht gefunden: ${pythonPath}`);
-		vscode.window.showErrorMessage(`Llama Autostart: Python nicht gefunden: ${pythonPath}`);
+	const mcpServerDir = 'C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\qwen2.5-7b-training\\mcp-server-misc';
+	
+	if (!fs.existsSync(mcpServerDir)) {
+		outputChannel.appendLine(`  FEHLER: MCP Server Submodul nicht gefunden: ${mcpServerDir}`);
+		outputChannel.appendLine('  Überspringe MCP Server Start');
 		return;
 	}
 
-	if (!fs.existsSync(mcpScript)) {
-		outputChannel.appendLine(`  FEHLER: web_mcp.py nicht gefunden: ${mcpScript}`);
-		vscode.window.showErrorMessage(`Llama Autostart: web_mcp.py nicht gefunden: ${mcpScript}`);
-		return;
-	}
-
-	outputChannel.appendLine(`  Python: ${pythonPath}`);
-	outputChannel.appendLine(`  Script: ${mcpScript}`);
-	vscode.window.showInformationMessage('Llama Autostart: Starte Web MCP Server...');
+	outputChannel.appendLine(`  MCP Server Verzeichnis: ${mcpServerDir}`);
+	vscode.window.showInformationMessage('Llama Autostart: Starte MCP Server (mcp-server-misc)...');
 
 	if (useIntegratedTerminal) {
 		const terminal = vscode.window.createTerminal({
-			name: 'MCP: mcp-context',
-			hideFromUser: false
+			name: 'MCP: web-context',
+			hideFromUser: false,
+			cwd: mcpServerDir
 		});
 		terminals.push(terminal);
 		
-		outputChannel.appendLine(`  Terminal erstellt: "MCP: mcp-context"`);
-		outputChannel.appendLine(`  Starte Befehl: "${pythonPath}" "${mcpScript}"`);
+		outputChannel.appendLine(`  Terminal erstellt: "MCP: web-context"`);
+		outputChannel.appendLine(`  Starte: python -m mcp_server`);
 		
 		terminal.show();
-		terminal.sendText(`& "${pythonPath}" "${mcpScript}"`, true);
+		terminal.sendText('python -m mcp_server', true);
 		
 		outputChannel.appendLine(`  Befehl gesendet!`);
 		
 		setTimeout(() => {
-			vscode.window.showInformationMessage('Llama Autostart: Web MCP Server wurde gestartet (siehe Terminal).');
+			vscode.window.showInformationMessage('Llama Autostart: MCP Server wurde gestartet (siehe Terminal).');
 		}, 2000);
 	} else {
-		const mcpProcess = cp.spawn(pythonPath, [mcpScript], {
+		const mcpProcess = cp.spawn('python', ['-m', 'mcp_server'], {
+			cwd: mcpServerDir,
 			detached: true,
-			stdio: 'ignore'
+			stdio: 'ignore',
+			windowsHide: true
 		});
 
 		mcpProcess.unref();
 
-		if (mcpProcess.pid) {
-			runningProcesses.push({ name: 'web-mcp', pid: mcpProcess.pid });
-			outputChannel.appendLine(`  Web MCP Server gestartet (PID: ${mcpProcess.pid})`);
-		}
-
 		mcpProcess.on('error', (err) => {
 			outputChannel.appendLine(`  FEHLER beim Starten: ${err.message}`);
-			vscode.window.showErrorMessage(`Llama Autostart: Web MCP Server Fehler: ${err.message}`);
+			vscode.window.showErrorMessage(`Llama Autostart: MCP Server Fehler: ${err.message}`);
 		});
 
 		setTimeout(() => {
-			vscode.window.showInformationMessage('Llama Autostart: Web MCP Server wurde gestartet.');
+			vscode.window.showInformationMessage('Llama Autostart: MCP Server wurde gestartet.');
 		}, 2000);
 	}
 }
@@ -308,12 +298,12 @@ export function deactivate() {
 	});
 
 	try {
-		cp.execSync('powershell -NoProfile -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like \'*web_mcp.py*\' } | Stop-Process -Force"', {
+		cp.execSync('powershell -NoProfile -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like \'*mcp_server*\' } | Stop-Process -Force"', {
 			windowsHide: true
 		});
-		console.log('MCP Python-Prozesse gestoppt');
+		console.log('MCP Server Python-Prozesse gestoppt');
 	} catch (err) {
-		console.log('Keine MCP Python-Prozesse gefunden oder Fehler beim Stoppen');
+		console.log('Keine MCP Server Python-Prozesse gefunden oder Fehler beim Stoppen');
 	}
 }
 
