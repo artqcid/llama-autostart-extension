@@ -49,42 +49,59 @@ function startServers() {
 
 	// Starte web_mcp.py direkt (ohne mcp.json)
 	startWebMcp(useIntegratedTerminal);
+	
+	// Starte Embedding Server
+	startEmbeddingServer(useIntegratedTerminal);
 }
 
 function stopServers() {
-	vscode.window.showInformationMessage('Llama Autostart: Stoppe Server...');
+	vscode.window.showInformationMessage('Llama Autostart: Stoppe alle Server...');
+	outputChannel.appendLine('=== stopServers() aufgerufen ===');
 	
 	terminals.forEach(terminal => {
 		terminal.dispose();
 	});
 	terminals.length = 0;
 
+	// Stop llama-server
 	try {
 		cp.execSync('powershell -NoProfile -Command "Get-Process llama-server -ErrorAction SilentlyContinue | Stop-Process -Force"', {
 			windowsHide: true
 		});
-		vscode.window.showInformationMessage('llama-server gestoppt');
+		outputChannel.appendLine('✓ llama-server gestoppt');
 	} catch (err) {
-		console.log('Kein llama-server-Prozess gefunden oder Fehler beim Stoppen');
+		outputChannel.appendLine('ℹ Kein llama-server-Prozess gefunden');
+	}
+
+	// Stop embedding server
+	try {
+		cp.execSync('powershell -NoProfile -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like \'*embedding_server*\' } | Stop-Process -Force"', {
+			windowsHide: true
+		});
+		outputChannel.appendLine('✓ Embedding Server gestoppt');
+	} catch (err) {
+		outputChannel.appendLine('ℹ Kein Embedding Server-Prozess gefunden');
+	}
+
+	// Stop MCP server
+	try {
+		cp.execSync('powershell -NoProfile -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like \'*mcp_server*\' } | Stop-Process -Force"', {
+			windowsHide: true
+		});
+		outputChannel.appendLine('✓ MCP Server gestoppt');
+	} catch (err) {
+		outputChannel.appendLine('ℹ Kein MCP Server-Prozess gefunden');
 	}
 
 	runningProcesses.forEach(proc => {
 		try {
 			process.kill(proc.pid, 'SIGTERM');
-			console.log(`${proc.name} (PID: ${proc.pid}) gestoppt`);
+			outputChannel.appendLine(`✓ ${proc.name} (PID: ${proc.pid}) gestoppt`);
 		} catch (err) {
-			console.log(`Fehler beim Stoppen von ${proc.name} (PID: ${proc.pid}):`, err);
+			outputChannel.appendLine(`ℹ ${proc.name} (PID: ${proc.pid}) konnte nicht gestoppt werden`);
 		}
 	});
 	runningProcesses.length = 0;
-
-	try {
-		cp.execSync('powershell -NoProfile -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like \'*web_mcp.py*\' } | Stop-Process -Force"', {
-			windowsHide: true
-		});
-	} catch (err) {
-		console.log('Keine MCP Python-Prozesse gefunden');
-	}
 }
 
 function startLlamaServer(scriptPath: string, useIntegratedTerminal: boolean) {
@@ -299,4 +316,59 @@ export function deactivate() {
 		console.log('Keine MCP Python-Prozesse gefunden oder Fehler beim Stoppen');
 	}
 }
+
+function startEmbeddingServer(useIntegratedTerminal: boolean) {
+	outputChannel.appendLine('=== startEmbeddingServer() aufgerufen ===');
+	
+	const embeddingDir = 'C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\qwen2.5-7b-training\\embedding-server-misc';
+	
+	if (!fs.existsSync(embeddingDir)) {
+		outputChannel.appendLine(`  FEHLER: Embedding Server nicht gefunden: ${embeddingDir}`);
+		outputChannel.appendLine('  Überspringe Embedding Server Start');
+		return;
+	}
+	
+	outputChannel.appendLine(`  Embedding Server Verzeichnis: ${embeddingDir}`);
+	vscode.window.showInformationMessage('Llama Autostart: Starte Embedding Server...');
+
+	if (useIntegratedTerminal) {
+		const terminal = vscode.window.createTerminal({
+			name: 'Embedding Server',
+			hideFromUser: false,
+			cwd: embeddingDir
+		});
+		terminals.push(terminal);
+		
+		outputChannel.appendLine(`  Terminal erstellt: "Embedding Server"`);
+		outputChannel.appendLine(`  Starte: python -m embedding_server`);
+		
+		terminal.show();
+		terminal.sendText('python -m embedding_server', true);
+		
+		outputChannel.appendLine(`  Befehl gesendet!`);
+		
+		setTimeout(() => {
+			vscode.window.showInformationMessage('Llama Autostart: Embedding Server wurde gestartet (siehe Terminal).');
+		}, 2000);
+	} else {
+		const ps = cp.spawn('python', ['-m', 'embedding_server'], {
+			cwd: embeddingDir,
+			detached: true,
+			stdio: 'ignore',
+			windowsHide: true
+		});
+
+		ps.unref();
+
+		ps.on('error', (err) => {
+			outputChannel.appendLine(`  FEHLER beim Starten: ${err.message}`);
+			vscode.window.showErrorMessage('Llama Autostart: Fehler beim Starten des Embedding Servers: ' + err.message);
+		});
+
+		setTimeout(() => {
+			vscode.window.showInformationMessage('Llama Autostart: Embedding Server wurde gestartet.');
+		}, 2000);
+	}
+}
+
 
