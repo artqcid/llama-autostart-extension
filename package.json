@@ -1,8 +1,8 @@
 {
-  "name": "llama-autostart",
-  "displayName": "Llama Autostart Extension",
-  "description": "Synchronisiert mcp.json und startet den Llama-Server beim Start von VS Code. Die Pfade zu den Skripten sind in den Extension-Einstellungen konfigurierbar.",
-  "version": "0.0.4",
+  "name": "server-autostart",
+  "displayName": "Server Autostart Extension",
+  "description": "Automatically starts AI servers (Llama, Embedding, MCP) when VS Code loads.",
+  "version": "0.0.5",
   "publisher": "artqcid",
   "repository": {
     "type": "git",
@@ -21,27 +21,31 @@
   "contributes": {
     "commands": [
       {
-        "command": "llamaAutostart.startServers",
-        "title": "Llama: Start Servers Manually"
+        "command": "serverAutostart.startServers",
+        "title": "Server Autostart: Start All Servers"
       },
       {
-        "command": "llamaAutostart.stopServers",
-        "title": "Llama: Stop Servers"
+        "command": "serverAutostart.stopServers",
+        "title": "Server Autostart: Stop All Servers"
+      },
+      {
+        "command": "serverAutostart.showStatus",
+        "title": "Server Autostart: Show Server Status"
       }
     ],
     "configuration": {
       "type": "object",
-      "title": "Llama Autostart Extension Configuration",
+      "title": "Server Autostart Extension Configuration",
       "properties": {
-        "llamaAutostart.autostartScriptPath": {
-          "type": "string",
-          "default": "C:/Users/marku/.continue/llama-vscode-autostart.ps1",
-          "description": "Pfad zum PowerShell-Startscript (autostart.ps1) für den Llama-Server."
+        "serverAutostart.autoStartDelay": {
+          "type": "number",
+          "default": 2000,
+          "description": "Delay in milliseconds before starting servers on VS Code activation (default: 2000ms)"
         },
-        "llamaAutostart.useIntegratedTerminal": {
-          "type": "boolean",
-          "default": true,
-          "description": "Server-Ausgaben im integrierten VS Code Terminal anzeigen (anstatt externe Fenster)."
+        "serverAutostart.mcpStartDelay": {
+          "type": "number",
+          "default": 3000,
+          "description": "Additional delay in milliseconds before starting MCP server after Llama+Embedding (default: 3000ms)"
         }
       }
     }
