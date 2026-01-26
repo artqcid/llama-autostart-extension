@@ -297,7 +297,21 @@ function stopAllServers() {
 	});
 	terminals.length = 0;
 
-	// Stop via PowerShell (Note: MCP is managed by Continue)
+	// Stop MCP Server first (via port-based stop script)
+	const paths = getServerPaths();
+	const mcpStopScript = path.join(paths.mcp, 'stop.ps1');
+	if (fs.existsSync(mcpStopScript)) {
+		try {
+			cp.execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${mcpStopScript}"`, {
+				windowsHide: true
+			});
+			outputChannel.appendLine('[OK] MCP Server gestoppt');
+		} catch (err) {
+			outputChannel.appendLine('[INFO] MCP Server nicht aktiv');
+		}
+	}
+
+	// Stop via PowerShell
 	const stopCommands = [
 		{
 			name: 'RAG Server + Qdrant',
@@ -392,22 +406,25 @@ function showServerStatus() {
 		outputChannel.appendLine('[STOP] Qdrant nicht aktiv');
 	}
 	
-	// Check MCP (managed by Continue, status only)
+	// Check MCP (SSE Server on port 8003)
 	outputChannel.appendLine('');
-	outputChannel.appendLine('[INFO] --- Continue-verwaltete Server ---');
-	try {
-		const result = cp.execSync(
-			"powershell -NoProfile -Command \"Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*mcp*' } | Select-Object ProcessName, Id\"",
-			{ encoding: 'utf-8', windowsHide: true }
-		);
-		if (result) {
-			outputChannel.appendLine('[OK] MCP-Server läuft (von Continue verwaltet)');
-		} else {
-			outputChannel.appendLine('[STOP] MCP-Server nicht aktiv (wird von Continue gestartet)');
-		}
-	} catch {
-		outputChannel.appendLine('[STOP] MCP-Server nicht aktiv (wird von Continue gestartet)');
-	}
+	outputChannel.appendLine('[INFO] --- MCP Server (SSE) ---');
+	const net = require('net');
+	const socket = new net.Socket();
+	socket.setTimeout(1000);
+	socket.once('connect', () => {
+		socket.destroy();
+		outputChannel.appendLine('[OK] MCP-Server läuft (Port 8003)');
+	});
+	socket.once('timeout', () => {
+		socket.destroy();
+		outputChannel.appendLine('[STOP] MCP-Server nicht aktiv (Port 8003)');
+	});
+	socket.once('error', () => {
+		socket.destroy();
+		outputChannel.appendLine('[STOP] MCP-Server nicht aktiv (Port 8003)');
+	});
+	socket.connect({ port: 8003, host: '127.0.0.1' });
 	
 	vscode.window.showInformationMessage('Server Status angezeigt (siehe Output)');
 }

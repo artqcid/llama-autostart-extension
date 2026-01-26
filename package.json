@@ -2,7 +2,7 @@
   "name": "juce-server-autostart",
   "displayName": "JUCE Server Autostart Extension",
   "description": "Automatically starts JUCE AI servers (Llama, Embedding, MCP) when VS Code loads.",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "publisher": "artqcid",
   "repository": {
     "type": "git",
