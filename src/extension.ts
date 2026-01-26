@@ -10,17 +10,24 @@ let serversStarted = false;
 
 // Server paths configuration (JUCE Development)
 const SERVER_PATHS = {
-	mcp: 'C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\mcp-server-misc',
 	embedding: 'C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\embedding-server-misc',
+	rag: 'C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\rag-server-misc',
 	llama: 'C:\\Users\\marku\\.continue\\llama-vscode-autostart.ps1'
+};
+
+// Server ports for health checks
+const SERVER_PORTS = {
+	llama: 8080,
+	embedding: 8001,
+	rag: 8002
 };
 
 // Load paths from settings
 function getServerPaths() {
 	const config = vscode.workspace.getConfiguration('juce-server-autostart');
 	return {
-		mcp: config.get<string>('mcpServerPath', SERVER_PATHS.mcp),
 		embedding: config.get<string>('embeddingServerPath', SERVER_PATHS.embedding),
+		rag: config.get<string>('ragServerPath', SERVER_PATHS.rag),
 		llama: config.get<string>('llamaScriptPath', SERVER_PATHS.llama)
 	};
 }
@@ -69,18 +76,27 @@ function startAllServers() {
 		return;
 	}
 
-	// Start Llama Server (fixed path)
+	// Startup sequence with dependencies:
+	// 1. Llama (Port 8080) - base
+	// 2. Embedding (Port 8001) - needs Llama
+	// 3. RAG (Port 8002) - needs Embedding + Qdrant
+	// Note: MCP is managed by Continue, not by this extension
+	
+	outputChannel.appendLine('[INFO] Startup-Sequenz: Llama → Embedding → RAG');
+	outputChannel.appendLine('[INFO] (MCP wird von Continue verwaltet)');
 	startLlamaServer();
 	
-	// Start Embedding Server
+	// Start Embedding Server after Llama
 	setTimeout(() => {
 		startEmbeddingServer();
-	}, 2000);
+	}, 3000);
 	
-	// Start MCP Server
+	// Start RAG Server after Embedding (with Qdrant auto-start)
 	setTimeout(() => {
-		startMcpServer();
-	}, 5000);
+		startRagServer();
+		outputChannel.appendLine('[OK] ===== Alle Server gestartet =====');
+		vscode.window.showInformationMessage('Alle AI-Server wurden erfolgreich gestartet!');
+	}, 8000);
 
 	serversStarted = true;
 }
@@ -98,9 +114,9 @@ function validateServerPaths(): boolean {
 		outputChannel.appendLine(`[ERROR] Embedding-Server Pfad nicht gefunden: ${paths.embedding}`);
 		allValid = false;
 	}
-	
-	if (!fs.existsSync(paths.mcp)) {
-		outputChannel.appendLine(`[ERROR] MCP-Server Pfad nicht gefunden: ${paths.mcp}`);
+
+	if (!fs.existsSync(paths.rag)) {
+		outputChannel.appendLine(`[ERROR] RAG-Server Pfad nicht gefunden: ${paths.rag}`);
 		allValid = false;
 	}
 	
@@ -109,7 +125,7 @@ function validateServerPaths(): boolean {
 
 function startLlamaServer() {
 	const paths = getServerPaths();
-	outputChannel.appendLine('[INFO] Starte Llama-Server...');
+	outputChannel.appendLine('[INFO] Starte Llama-Server auf Port 8080...');
 	
 	const terminal = vscode.window.createTerminal({
 		name: 'Llama Server',
@@ -121,11 +137,59 @@ function startLlamaServer() {
 	const command = `powershell -NoProfile -ExecutionPolicy Bypass -File "${paths.llama}"`;
 	outputChannel.appendLine(`[CMD] ${command}`);
 	terminal.sendText(command, true);
+	
+	// Health check
+	setTimeout(() => {
+		checkServerHealth('Llama', SERVER_PORTS.llama);
+	}, 5000);
+}
+
+/**
+ * Health check for TCP port availability
+ */
+async function checkServerHealth(serverName: string, port: number, maxRetries: number = 10): Promise<boolean> {
+	return new Promise((resolve) => {
+		let retries = 0;
+		const check = () => {
+			const net = require('net');
+			const socket = new net.Socket();
+			
+			socket.setTimeout(1000);
+			socket.once('connect', () => {
+				socket.destroy();
+				outputChannel.appendLine(`[OK] ${serverName} ist verfügbar (Port ${port})`);
+				resolve(true);
+			});
+			socket.once('timeout', () => {
+				socket.destroy();
+				retries++;
+				if (retries < maxRetries) {
+					setTimeout(check, 1000);
+				} else {
+					outputChannel.appendLine(`[WARN] ${serverName} hat nicht geantwortet nach ${maxRetries * 1000}ms`);
+					resolve(false);
+				}
+			});
+			socket.once('error', () => {
+				socket.destroy();
+				retries++;
+				if (retries < maxRetries) {
+					setTimeout(check, 1000);
+				} else {
+					outputChannel.appendLine(`[WARN] ${serverName} konnte nicht erreicht werden (Port ${port})`);
+					resolve(false);
+				}
+			});
+			
+			socket.connect({ port, host: '127.0.0.1' });
+		};
+		check();
+	});
 }
 
 function startEmbeddingServer() {
 	const paths = getServerPaths();
-	outputChannel.appendLine(`[INFO] Starte Embedding-Server: ${paths.embedding}`);
+	outputChannel.appendLine(`[INFO] Starte Embedding-Server auf Port 8001: ${paths.embedding}`);
 	
 	const startScript = path.join(paths.embedding, 'start.ps1');
 	
@@ -145,22 +209,27 @@ function startEmbeddingServer() {
 	const command = `pwsh -NoProfile -ExecutionPolicy Bypass -File "${startScript}"`;
 	outputChannel.appendLine(`[CMD] ${command}`);
 	terminal.sendText(command, true);
+	
+	// Health check
+	setTimeout(() => {
+		checkServerHealth('Embedding', SERVER_PORTS.embedding);
+	}, 3000);
 }
 
-function startMcpServer() {
+function startRagServer() {
 	const paths = getServerPaths();
-	outputChannel.appendLine(`[INFO] Starte MCP-Server: ${paths.mcp}`);
+	outputChannel.appendLine(`[INFO] Starte RAG-Server auf Port 8002: ${paths.rag}`);
 	
-	const startScript = path.join(paths.mcp, 'start.ps1');
+	const startScript = path.join(paths.rag, 'start.ps1');
 	
 	if (!fs.existsSync(startScript)) {
 		outputChannel.appendLine(`[ERROR] start.ps1 nicht gefunden: ${startScript}`);
-		vscode.window.showErrorMessage('MCP Server start.ps1 nicht gefunden');
+		vscode.window.showErrorMessage('RAG Server start.ps1 nicht gefunden');
 		return;
 	}
 	
 	const terminal = vscode.window.createTerminal({
-		name: 'MCP Server',
+		name: 'RAG Server',
 		hideFromUser: false
 	});
 	terminals.push(terminal);
@@ -169,6 +238,11 @@ function startMcpServer() {
 	const command = `pwsh -NoProfile -ExecutionPolicy Bypass -File "${startScript}"`;
 	outputChannel.appendLine(`[CMD] ${command}`);
 	terminal.sendText(command, true);
+	
+	// Health check
+	setTimeout(() => {
+		checkServerHealth('RAG', SERVER_PORTS.rag);
+	}, 5000);
 }
 
 function stopAllServers() {
@@ -182,19 +256,19 @@ function stopAllServers() {
 	});
 	terminals.length = 0;
 
-	// Stop via PowerShell
+	// Stop via PowerShell (Note: MCP is managed by Continue)
 	const stopCommands = [
 		{
-			name: 'Llama-Server',
-			cmd: 'Get-Process llama-server -ErrorAction SilentlyContinue | Stop-Process -Force'
+			name: 'RAG Server + Qdrant',
+			cmd: "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*rag*' } | Stop-Process -Force; Get-Process qdrant -ErrorAction SilentlyContinue | Stop-Process -Force"
 		},
 		{
 			name: 'Embedding Server',
 			cmd: "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*embedding_server*' } | Stop-Process -Force"
 		},
 		{
-			name: 'MCP Server',
-			cmd: "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*mcp_server*' } | Stop-Process -Force"
+			name: 'Llama-Server',
+			cmd: 'Get-Process llama-server -ErrorAction SilentlyContinue | Stop-Process -Force'
 		}
 	];
 
@@ -246,20 +320,52 @@ function showServerStatus() {
 	} catch {
 		outputChannel.appendLine('[STOP] Embedding-Server nicht aktiv');
 	}
+
+	// Check RAG
+	try {
+		const result = cp.execSync(
+			"powershell -NoProfile -Command \"Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*rag*' } | Select-Object ProcessName, Id\"",
+			{ encoding: 'utf-8', windowsHide: true }
+		);
+		if (result) {
+			outputChannel.appendLine('[OK] RAG-Server läuft');
+		} else {
+			outputChannel.appendLine('[STOP] RAG-Server nicht aktiv');
+		}
+	} catch {
+		outputChannel.appendLine('[STOP] RAG-Server nicht aktiv');
+	}
+
+	// Check Qdrant
+	try {
+		const result = cp.execSync(
+			"powershell -NoProfile -Command \"Get-Process qdrant -ErrorAction SilentlyContinue | Select-Object ProcessName, Id\"",
+			{ encoding: 'utf-8', windowsHide: true }
+		);
+		if (result) {
+			outputChannel.appendLine('[OK] Qdrant läuft');
+		} else {
+			outputChannel.appendLine('[STOP] Qdrant nicht aktiv');
+		}
+	} catch {
+		outputChannel.appendLine('[STOP] Qdrant nicht aktiv');
+	}
 	
-	// Check MCP
+	// Check MCP (managed by Continue, status only)
+	outputChannel.appendLine('');
+	outputChannel.appendLine('[INFO] --- Continue-verwaltete Server ---');
 	try {
 		const result = cp.execSync(
 			"powershell -NoProfile -Command \"Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*mcp*' } | Select-Object ProcessName, Id\"",
 			{ encoding: 'utf-8', windowsHide: true }
 		);
 		if (result) {
-			outputChannel.appendLine('[OK] MCP-Server läuft');
+			outputChannel.appendLine('[OK] MCP-Server läuft (von Continue verwaltet)');
 		} else {
-			outputChannel.appendLine('[STOP] MCP-Server nicht aktiv');
+			outputChannel.appendLine('[STOP] MCP-Server nicht aktiv (wird von Continue gestartet)');
 		}
 	} catch {
-		outputChannel.appendLine('[STOP] MCP-Server nicht aktiv');
+		outputChannel.appendLine('[STOP] MCP-Server nicht aktiv (wird von Continue gestartet)');
 	}
 	
 	vscode.window.showInformationMessage('Server Status angezeigt (siehe Output)');

@@ -37,15 +37,15 @@
       "type": "object",
       "title": "JUCE Server Autostart Configuration",
       "properties": {
-        "juce-server-autostart.mcpServerPath": {
-          "type": "string",
-          "default": "C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\mcp-server-misc",
-          "description": "Path to JUCE MCP Server directory"
-        },
         "juce-server-autostart.embeddingServerPath": {
           "type": "string",
           "default": "C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\embedding-server-misc",
           "description": "Path to JUCE Embedding Server directory"
+        },
+        "juce-server-autostart.ragServerPath": {
+          "type": "string",
+          "default": "C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\rag-server-misc",
+          "description": "Path to JUCE RAG Server directory"
         },
         "juce-server-autostart.llamaScriptPath": {
           "type": "string",
