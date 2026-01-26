@@ -2,7 +2,7 @@
   "name": "juce-server-autostart",
   "displayName": "JUCE Server Autostart Extension",
   "description": "Automatically starts JUCE AI servers (Llama, Embedding, MCP) when VS Code loads.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "artqcid",
   "repository": {
     "type": "git",
@@ -46,6 +46,11 @@
           "type": "string",
           "default": "C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\rag-server-misc",
           "description": "Path to JUCE RAG Server directory"
+        },
+        "juce-server-autostart.mcpServerPath": {
+          "type": "string",
+          "default": "C:\\Users\\marku\\Documents\\GitHub\\artqcid\\ai-projects\\mcp-server-misc",
+          "description": "Path to MCP Server directory (SSE mode)"
         },
         "juce-server-autostart.llamaScriptPath": {
           "type": "string",
